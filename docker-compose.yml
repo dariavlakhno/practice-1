@@ -1,0 +1,106 @@
+# Локальный Lakehouse: MinIO + PostgreSQL + Lakekeeper (Iceberg REST) + Trino (+ Metabase для части 2)
+# Запуск: ./scripts/setup.sh   (он сам поднимет стек и создаст warehouse в Lakekeeper)
+
+services:
+  # --- Объектное хранилище (S3-совместимое): сюда физически попадают parquet-файлы ---
+  minio:
+    image: minio/minio:latest
+    container_name: lakehouse-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # веб-консоль
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # --- Создаём бакет lakehouse один раз ---
+  minio-init:
+    image: minio/mc:latest
+    container_name: lakehouse-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb -p local/lakehouse &&
+      echo 'bucket lakehouse ready'
+      "
+    restart: "no"
+
+  # --- PostgreSQL: хранит метаданные каталога Lakekeeper ---
+  postgres:
+    image: postgres:16
+    container_name: lakehouse-pg
+    environment:
+      POSTGRES_USER: lakekeeper
+      POSTGRES_PASSWORD: lakekeeper
+      POSTGRES_DB: lakekeeper
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lakekeeper -d lakekeeper"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # --- Миграции БД Lakekeeper (выполняются один раз) ---
+  lakekeeper-migrate:
+    image: quay.io/lakekeeper/catalog:latest-main
+    container_name: lakehouse-lakekeeper-migrate
+    command: ["migrate"]
+    environment: &lk-env
+      LAKEKEEPER__PG_ENCRYPTION_KEY: "lab-secret-key-change-me"
+      LAKEKEEPER__PG_DATABASE_URL_READ: postgresql://lakekeeper:lakekeeper@postgres:5432/lakekeeper
+      LAKEKEEPER__PG_DATABASE_URL_WRITE: postgresql://lakekeeper:lakekeeper@postgres:5432/lakekeeper
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # --- Lakekeeper: Iceberg REST Catalog ---
+  lakekeeper:
+    image: quay.io/lakekeeper/catalog:latest-main
+    container_name: lakekeeper
+    command: ["serve"]
+    environment: *lk-env
+    ports:
+      - "8181:8181"   # REST API + UI (http://localhost:8181/ui)
+    depends_on:
+      lakekeeper-migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+
+  # --- Trino: SQL-движок ---
+  trino:
+    image: trinodb/trino:latest
+    container_name: trino
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog:ro
+      - ./sql:/sql:ro
+    depends_on:
+      - lakekeeper
+
+  # --- Часть 2: BI-инструмент (Metabase) ---
+  metabase:
+    image: metabase/metabase:latest
+    container_name: metabase
+    ports:
+      - "3000:3000"
+    depends_on:
+      - trino
+
+volumes:
+  minio-data:
+  pg-data:
