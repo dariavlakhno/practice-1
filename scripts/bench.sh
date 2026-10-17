@@ -26,10 +26,10 @@ for codec in $CODECS; do
   tr_q "CREATE SCHEMA IF NOT EXISTS iceberg.${schema}" >/dev/null
 
   s=$(now)
-  docker exec trino trino --session "iceberg.compression_codec=${codec}" --execute "
-    CREATE TABLE iceberg.${schema}.customer WITH (format='PARQUET') AS SELECT custkey, mktsegment FROM tpch.sf1.customer;
-    CREATE TABLE iceberg.${schema}.orders   WITH (format='PARQUET') AS SELECT orderkey, custkey, orderdate, shippriority FROM tpch.sf1.orders;
-    CREATE TABLE iceberg.${schema}.lineitem WITH (format='PARQUET') AS SELECT orderkey, extendedprice, discount, shipdate FROM tpch.sf1.lineitem;
+  docker exec trino trino --execute "
+    CREATE TABLE iceberg.${schema}.customer WITH (format='PARQUET', compression_codec='${codec}') AS SELECT custkey, mktsegment FROM tpch.sf1.customer;
+    CREATE TABLE iceberg.${schema}.orders   WITH (format='PARQUET', compression_codec='${codec}') AS SELECT orderkey, custkey, orderdate, shippriority FROM tpch.sf1.orders;
+    CREATE TABLE iceberg.${schema}.lineitem WITH (format='PARQUET', compression_codec='${codec}') AS SELECT orderkey, extendedprice, discount, shipdate FROM tpch.sf1.lineitem;
   " >/dev/null
   e=$(now); write_s=$(echo "$e - $s" | bc)
 

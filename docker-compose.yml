@@ -1,45 +1,32 @@
 # Локальный Lakehouse: MinIO + PostgreSQL + Lakekeeper (Iceberg REST) + Trino (+ Metabase для части 2)
-# Запуск: ./scripts/setup.sh   (он сам поднимет стек и создаст warehouse в Lakekeeper)
+# Запуск: ./scripts/setup.sh   (он сам поднимет стек, создаст бакет и warehouse в Lakekeeper)
+#
+# Все сервисы работают в сети самой машины (network_mode: host) и общаются через localhost.
+# Так сделано потому, что во внутренней сети Docker в GitHub Codespaces контейнеры не видят друг друга.
+# Порты: MinIO 9000/9001, PostgreSQL 5432, Lakekeeper 8181, Trino 8080, Metabase 3000.
+#
+# ВАЖНО: официальные образы minio/minio и minio/mc удалены из Docker Hub и quay.io,
+# поэтому используются сборки Chainguard (тот же MinIO).
 
 services:
   # --- Объектное хранилище (S3-совместимое): сюда физически попадают parquet-файлы ---
   minio:
-    image: minio/minio:latest
+    image: cgr.dev/chainguard/minio:latest
     container_name: lakehouse-minio
+    network_mode: host
     command: server /data --console-address ":9001"
+    user: "0:0"            # запуск от root, чтобы не настраивать права на папку данных
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # веб-консоль
     volumes:
       - minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  # --- Создаём бакет lakehouse один раз ---
-  minio-init:
-    image: minio/mc:latest
-    container_name: lakehouse-minio-init
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 minioadmin minioadmin &&
-      mc mb -p local/lakehouse &&
-      echo 'bucket lakehouse ready'
-      "
-    restart: "no"
 
   # --- PostgreSQL: хранит метаданные каталога Lakekeeper ---
   postgres:
     image: postgres:16
     container_name: lakehouse-pg
+    network_mode: host
     environment:
       POSTGRES_USER: lakekeeper
       POSTGRES_PASSWORD: lakekeeper
@@ -47,7 +34,7 @@ services:
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lakekeeper -d lakekeeper"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U lakekeeper -d lakekeeper"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -56,36 +43,36 @@ services:
   lakekeeper-migrate:
     image: quay.io/lakekeeper/catalog:latest-main
     container_name: lakehouse-lakekeeper-migrate
+    network_mode: host
     command: ["migrate"]
     environment: &lk-env
       LAKEKEEPER__PG_ENCRYPTION_KEY: "lab-secret-key-change-me"
-      LAKEKEEPER__PG_DATABASE_URL_READ: postgresql://lakekeeper:lakekeeper@postgres:5432/lakekeeper
-      LAKEKEEPER__PG_DATABASE_URL_WRITE: postgresql://lakekeeper:lakekeeper@postgres:5432/lakekeeper
+      LAKEKEEPER__METRICS_PORT: "9100"
+      LAKEKEEPER__PG_DATABASE_URL_READ: postgresql://lakekeeper:lakekeeper@localhost:5432/lakekeeper
+      LAKEKEEPER__PG_DATABASE_URL_WRITE: postgresql://lakekeeper:lakekeeper@localhost:5432/lakekeeper
     depends_on:
       postgres:
         condition: service_healthy
     restart: "no"
 
-  # --- Lakekeeper: Iceberg REST Catalog ---
+  # --- Lakekeeper: Iceberg REST Catalog (http://localhost:8181/ui) ---
   lakekeeper:
     image: quay.io/lakekeeper/catalog:latest-main
     container_name: lakekeeper
+    network_mode: host
     command: ["serve"]
     environment: *lk-env
-    ports:
-      - "8181:8181"   # REST API + UI (http://localhost:8181/ui)
     depends_on:
       lakekeeper-migrate:
         condition: service_completed_successfully
-      minio-init:
-        condition: service_completed_successfully
+      minio:
+        condition: service_started
 
   # --- Trino: SQL-движок ---
   trino:
     image: trinodb/trino:latest
     container_name: trino
-    ports:
-      - "8080:8080"
+    network_mode: host
     volumes:
       - ./trino/catalog:/etc/trino/catalog:ro
       - ./sql:/sql:ro
@@ -96,8 +83,7 @@ services:
   metabase:
     image: metabase/metabase:latest
     container_name: metabase
-    ports:
-      - "3000:3000"
+    network_mode: host
     depends_on:
       - trino
 
