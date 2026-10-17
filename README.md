@@ -3,7 +3,7 @@
 Автор: Влахно Дарья Максимовна, группа БИВТ-24-СП-4.
 
 Стек: MinIO + PostgreSQL + Lakekeeper (Iceberg REST Catalog) + Trino + Metabase.
-Данные: коннектор `tpch`, масштаб `sf1`. Подробный отчёт — в (otchet.docx).
+Данные: коннектор `tpch`, масштаб `sf1`. Подробный отчёт — в (otchet.md).
 
 ## Структура
 
@@ -44,7 +44,7 @@ Trino http://localhost:8080, Metabase http://localhost:3000.
    (`"table$files"`) и время Q3 (1 прогрев + 3 замера, берётся минимум и среднее).
 5. **Часть 2** — schema evolution и откат из снапшота на Silver; Metabase подключён к Trino и показывает Bronze.
 
-Обоснования всех решений — в (otchet.docx).
+Обоснования всех решений — в (otchet.md).
 
 ## Остановка
 
