@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-# Прогоняет Bronze -> Silver -> Gold -> проверку. Замеряет время каждого шага.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -11,7 +9,6 @@ run() {
   printf "    время шага: %.1f c\n" "$(echo "$e - $s" | bc)"
 }
 
-# если запускаешь повторно — сначала чистим
 docker exec trino trino --execute "
 DROP TABLE IF EXISTS iceberg.gold.shipping_priority_top10;
 DROP TABLE IF EXISTS iceberg.silver.order_lines;

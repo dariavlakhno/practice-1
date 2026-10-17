@@ -1,6 +1,3 @@
--- BRONZE: сырые данные Q3 (только нужные колонки) из генератора tpch.sf1
--- Формат/сжатие берутся из каталога: PARQUET + ZSTD.
-
 CREATE SCHEMA IF NOT EXISTS iceberg.bronze;
 
 CREATE TABLE iceberg.bronze.customer

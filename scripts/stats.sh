@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
-# Печатает для отчёта: строки и вес (МБ) по всем таблицам слоёв, готовыми строками markdown.
 set -euo pipefail
 
 t() { docker exec trino trino --output-format CSV_UNQUOTED --execute "$1" | tail -1; }

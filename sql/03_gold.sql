@@ -1,4 +1,3 @@
--- GOLD: витрина — ответ на Q3 (топ-10 заказов по выручке)
 
 CREATE SCHEMA IF NOT EXISTS iceberg.gold;
 

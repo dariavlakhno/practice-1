@@ -1,28 +1,20 @@
-# Локальный Lakehouse: MinIO + PostgreSQL + Lakekeeper (Iceberg REST) + Trino (+ Metabase для части 2)
-# Запуск: ./scripts/setup.sh   (он сам поднимет стек, создаст бакет и warehouse в Lakekeeper)
-#
-# Все сервисы работают в сети самой машины (network_mode: host) и общаются через localhost.
-# Так сделано потому, что во внутренней сети Docker в GitHub Codespaces контейнеры не видят друг друга.
-# Порты: MinIO 9000/9001, PostgreSQL 5432, Lakekeeper 8181, Trino 8080, Metabase 3000.
-#
-# ВАЖНО: официальные образы minio/minio и minio/mc удалены из Docker Hub и quay.io,
-# поэтому используются сборки Chainguard (тот же MinIO).
+
 
 services:
-  # --- Объектное хранилище (S3-совместимое): сюда физически попадают parquet-файлы ---
+  
   minio:
     image: cgr.dev/chainguard/minio:latest
     container_name: lakehouse-minio
     network_mode: host
     command: server /data --console-address ":9001"
-    user: "0:0"            # запуск от root, чтобы не настраивать права на папку данных
+    user: "0:0"            
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
       - minio-data:/data
 
-  # --- PostgreSQL: хранит метаданные каталога Lakekeeper ---
+ 
   postgres:
     image: postgres:16
     container_name: lakehouse-pg
@@ -39,7 +31,7 @@ services:
       timeout: 5s
       retries: 20
 
-  # --- Миграции БД Lakekeeper (выполняются один раз) ---
+ 
   lakekeeper-migrate:
     image: quay.io/lakekeeper/catalog:latest-main
     container_name: lakehouse-lakekeeper-migrate
@@ -55,7 +47,7 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # --- Lakekeeper: Iceberg REST Catalog (http://localhost:8181/ui) ---
+  
   lakekeeper:
     image: quay.io/lakekeeper/catalog:latest-main
     container_name: lakekeeper
@@ -68,7 +60,7 @@ services:
       minio:
         condition: service_started
 
-  # --- Trino: SQL-движок ---
+  
   trino:
     image: trinodb/trino:latest
     container_name: trino
@@ -79,7 +71,7 @@ services:
     depends_on:
       - lakekeeper
 
-  # --- Часть 2: BI-инструмент (Metabase) ---
+  
   metabase:
     image: metabase/metabase:latest
     container_name: metabase

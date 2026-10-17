@@ -1,9 +1,3 @@
-#!/usr/bin/env bash
-# Бенчмарк кодеков сжатия на Bronze: для каждого кодека
-#   1) создаёт schema bronze_<codec> и заливает 3 таблицы Q3 (меряет время записи),
-#   2) считает размер файлов,
-#   3) прогоняет Q3 (1 прогрев + 3 замера, берём минимум и среднее).
-# Результат: bench_results.csv и готовые строки для отчёта.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -45,7 +39,7 @@ for codec in $CODECS; do
      WHERE c.mktsegment='BUILDING' AND o.orderdate < DATE '1995-03-15' AND l.shipdate > DATE '1995-03-15'
      GROUP BY l.orderkey, o.orderdate, o.shippriority ORDER BY revenue DESC LIMIT 10"
 
-  tr_q "$Q" >/dev/null   # прогрев
+  tr_q "$Q" >/dev/null   
   times=()
   for i in $(seq $RUNS); do
     s=$(now); tr_q "$Q" >/dev/null; e=$(now)

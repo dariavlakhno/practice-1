@@ -1,9 +1,3 @@
--- SILVER: очистка, нормализация, обогащение.
---  * нормализация: mktsegment -> upper(trim(...))
---  * фильтрация: сегмент BUILDING, orderdate < 1995-03-15, shipdate > 1995-03-15
---  * обогащение: считаем revenue_line = extendedprice * (1 - discount) на уровне строки
---  * джойн customer + orders + lineitem в один факт «строки заказов»
-
 CREATE SCHEMA IF NOT EXISTS iceberg.silver;
 
 CREATE TABLE iceberg.silver.order_lines
